@@ -24,7 +24,7 @@
     PowerShellVersion = '5.1'
 
     # Functions to export from this module
-    FunctionsToExport = @('Deploy-GeoBlock', 'Get-EntraIDHardeningSettings', 'Set-EntraIDHardeningSetting')
+    FunctionsToExport = @('Deploy-GeoBlock', 'Get-EntraIDHardeningSettings', 'Set-EntraIDHardeningSetting', 'Get-EntraIDTenantInfo')
 
     # Cmdlets to export from this module
     CmdletsToExport   = @()
