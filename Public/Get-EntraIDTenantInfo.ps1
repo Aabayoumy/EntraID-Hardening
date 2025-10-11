@@ -1,16 +1,15 @@
 <#
 .SYNOPSIS
-    Gets Entra ID tenant information including tenant name, id, owners, and global admins.
+    Gets Entra ID tenant information including tenant name, id, and global admins.
 
 .DESCRIPTION
-    Retrieves the current Entra ID (Azure AD) tenant's display name and id, and lists all users with the Owner and Global Administrator roles.
+    Retrieves the current Entra ID (Azure AD) tenant's display name and id, and lists all users with the Global Administrator role.
 
 .EXAMPLE
     PS> Get-EntraIDTenantInfo
 
     TenantName   : Contoso Ltd
     TenantId     : 12345678-90ab-cdef-1234-567890abcdef
-    Owners       : {@{DisplayName=John Doe; UserPrincipalName=johndoe@contoso.com}, ...}
     GlobalAdmins : {@{DisplayName=Jane Admin; UserPrincipalName=jane@contoso.com}, ...}
 #>
 
@@ -44,17 +43,9 @@ function Get-EntraIDTenantInfo {
         $globalAdmins = Get-MgDirectoryRoleMember -DirectoryRoleId $globalAdminRole.Id | Where-Object { $_.ODataType -eq "#microsoft.graph.user" } | Select-Object DisplayName, UserPrincipalName
     }
 
-    # Find Owner role (if available)
-    $ownerRole = $roles | Where-Object { $_.DisplayName -eq "Owner" }
-    $owners = @()
-    if ($ownerRole) {
-        $owners = Get-MgDirectoryRoleMember -DirectoryRoleId $ownerRole.Id | Where-Object { $_.ODataType -eq "#microsoft.graph.user" } | Select-Object DisplayName, UserPrincipalName
-    }
-
     [PSCustomObject]@{
         TenantName   = $org.DisplayName
         TenantId     = $org.Id
-        Owners       = $owners
         GlobalAdmins = $globalAdmins
     }
 }
