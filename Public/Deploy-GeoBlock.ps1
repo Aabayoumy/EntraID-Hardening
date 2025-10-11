@@ -10,25 +10,14 @@ function Deploy-GeoBlock {
   4. Creates a named location "Suspicious Countries - High Risk".  
   5. Creates a CA policy "Block Access from Suspicious Countries" in report-only mode, excluding the break-glass group.  
 
-.PARAMETER BreakGlassUserUPNs
-  An array of UPNs for emergency access accounts.
-
-.EXAMPLE
-Deploy-GeoBlock -BreakGlassUserUPNs @("admin@contoso.com")
 #>
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)]
-        [string[]]$BreakGlassUserUPNs
-    )
-
     Import-Module Microsoft.Graph.Identity.SignIns -ErrorAction Stop
 
     try {
         Write-Output "Connecting to Microsoft Graph..."
         Connect-MgGraph -Scopes "Group.ReadWrite.All", "Directory.ReadWrite.All", "Policy.ReadWrite.ConditionalAccess" -NoWelcome
         # 1. Create Break-Glass Group
-        $groupName = "BreakGlassEmergencyAccess"
+        $groupName = $Global:EntraIDHardeningSettings.BreakGlassGroupName
         $existingGroup = Get-MgGroup -Filter "displayName eq '$groupName'" -ConsistencyLevel eventual -CountVariable cnt
         if ($existingGroup -and $cnt -gt 0) {
             $groupId = $existingGroup.Id
@@ -48,20 +37,25 @@ Deploy-GeoBlock -BreakGlassUserUPNs @("admin@contoso.com")
             Write-Output "Created group '$groupName' (ID: $groupId)."
         }
 
-        # 2. Add users to Break-Glass Group
-        foreach ($upn in $BreakGlassUserUPNs) {
-            $user = Get-MgUser -UserId $upn -ErrorAction SilentlyContinue
-            if ($null -eq $user) {
-                Write-Warning "User $upn not found; skipping."
-                continue
-            }
-            $memberCheck = Get-MgGroupMember -GroupId $groupId -All | Where-Object { $_.Id -eq $user.Id }
-            if ($memberCheck) {
-                Write-Output "User $upn already in break-glass group."
-            }
-            else {
-                Write-Output "Adding $upn to break-glass group..."
-                New-MgGroupMember -GroupId $groupId -DirectoryObjectId $user.Id
+        # 2. Add users to Break-Glass Group from settings
+        $breakGlassUserUPNs = $Global:EntraIDHardeningSettings.BreakGlassUserUPNs
+        if (-not $breakGlassUserUPNs) {
+            Write-Warning "No BreakGlassUserUPNs found in settings. Skipping user addition."
+        } else {
+            foreach ($upn in $breakGlassUserUPNs) {
+                $user = Get-MgUser -UserId $upn -ErrorAction SilentlyContinue
+                if ($null -eq $user) {
+                    Write-Warning "User $upn not found; skipping."
+                    continue
+                }
+                $memberCheck = Get-MgGroupMember -GroupId $groupId -All | Where-Object { $_.Id -eq $user.Id }
+                if ($memberCheck) {
+                    Write-Output "User $upn already in break-glass group."
+                }
+                else {
+                    Write-Output "Adding $upn to break-glass group..."
+                    New-MgGroupMember -GroupId $groupId -DirectoryObjectId $user.Id
+                }
             }
         }
 

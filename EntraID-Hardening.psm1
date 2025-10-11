@@ -1,3 +1,6 @@
+# Dot-source settings loader first
+. "$PSScriptRoot/Private/Settings.ps1"
+
 # Dot-source all public functions
 Get-ChildItem -Path "$PSScriptRoot/Public/*.ps1" -ErrorAction SilentlyContinue | ForEach-Object {
     . $_.FullName
@@ -5,7 +8,9 @@ Get-ChildItem -Path "$PSScriptRoot/Public/*.ps1" -ErrorAction SilentlyContinue |
 
 # Dot-source all private functions
 Get-ChildItem -Path "$PSScriptRoot/Private/*.ps1" -ErrorAction SilentlyContinue | ForEach-Object {
-    . $_.FullName
+    if ($_.FullName -ne "$PSScriptRoot/Private/Settings.ps1") {
+        . $_.FullName
+    }
 }
 
 # Export all public functions
