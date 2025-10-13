@@ -45,12 +45,13 @@ function Get-EntraIDTenantInfo {
     Connect-MgGraph -Scopes "Directory.Read.All", "RoleManagement.Read.Directory"
 
     # Get tenant (organization) info
-    Get-MgOrganization | Format-List Id, DisplayName
+    $orgInfo = Get-MgOrganization | Format-List Id, DisplayName | Out-String
+    $orgInfo.Trim().Split("`n") | ForEach-Object { Write-Host $_ -ForegroundColor Green }
 
     
     # Get Global Administrator role ID
     $role = Get-MgDirectoryRole | Where-Object { $_.DisplayName -eq "Global Administrator" }
-    if ($null -eq $role) { Write-Host "Global Administrator role not enabled." ; return }
+    if ($null -eq $role) { Write-Warning "Global Administrator role not enabled." ; return }
 
     # Get all members assigned to Global Administrator
     $admins = Get-MgDirectoryRoleMember -DirectoryRoleId $role.Id
@@ -59,7 +60,7 @@ function Get-EntraIDTenantInfo {
     Write-Host "** Global Administrators **" 
     $admins | Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.user' }  | ForEach-Object {
         $user = Get-MgUser -UserId $_.Id -Property UserPrincipalName, DisplayName 
-        Write-Output "$($user.DisplayName) - $($user.UserPrincipalName)"
+        Write-Host "$($user.DisplayName) - $($user.UserPrincipalName)" -ForegroundColor Blue
     }
 
     # Get all subscribed license SKUs for the tenant
@@ -70,10 +71,10 @@ function Get-EntraIDTenantInfo {
         $skuPartNumber = $license.SkuPartNumber
         $enabled = $license.PrepaidUnits.Enabled
         $consumed = $license.ConsumedUnits
-        Write-Output "License SKU: $skuPartNumber"
-        Write-Output "  Purchased (Enabled): $enabled"
-        Write-Output "  Assigned (Consumed): $consumed"
-        Write-Output ""
+        Write-Host "License SKU: $skuPartNumber" -ForegroundColor Blue
+        Write-Host "  Purchased (Enabled): $enabled" -ForegroundColor Blue
+        Write-Host "  Assigned (Consumed): $consumed" -ForegroundColor Blue
+        Write-Host "" -ForegroundColor Blue
     }
 
 
