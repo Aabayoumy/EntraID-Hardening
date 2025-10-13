@@ -8,44 +8,74 @@
 .EXAMPLE
     PS> Get-EntraIDTenantInfo
 
-    TenantName   : Contoso Ltd
-    TenantId     : 12345678-90ab-cdef-1234-567890abcdef
-    GlobalAdmins : {@{DisplayName=Jane Admin; UserPrincipalName=jane@contoso.com}, ...}
+
+    Id          : 12345678-90ab-cdef-1234-567890abcdef
+    DisplayName : Contoso Ltd
+
+    ** Global Administrators **
+    Faculty-admin - facultyadmin@contoso704.onmicrosoft.com
+    ladmin - ladmin@contoso704.onmicrosoft.com
+    hybriduser03 - hybriduser03@contoso704.onmicrosoft.com
+    scanner - scanner@contoso704.onmicrosoft.com
+    License SKU: Microsoft_Entra_Suite
+    Purchased (Enabled): 25
+    Assigned (Consumed): 6
+
+    License SKU: RIGHTSMANAGEMENT_ADHOC
+    Purchased (Enabled): 10000
+    Assigned (Consumed): 2
+
+    License SKU: FLOW_FREE
+    Purchased (Enabled): 10000
+    Assigned (Consumed): 13
+
+    License SKU: SPE_E5
+    Purchased (Enabled): 50
+    Assigned (Consumed): 45
+    
 #>
 
 function Get-EntraIDTenantInfo {
     [CmdletBinding()]
     param()
+    # Import Microsoft Graph module (install if needed)
+    Import-Module Microsoft.Graph  -NoWelcome -ErrorAction Stop
 
-    # Ensure Microsoft.Graph module is available
-    if (-not (Get-Module -ListAvailable -Name Microsoft.Graph)) {
-        Write-Error "Microsoft.Graph PowerShell module is required. Install it with: Install-Module Microsoft.Graph"
-        return
+    # Connect with minimal scopes required
+    Connect-MgGraph -Scopes "Directory.Read.All", "RoleManagement.Read.Directory"
+
+    # Get tenant (organization) info
+    Get-MgOrganization | Format-List Id, DisplayName
+
+    
+    # Get Global Administrator role ID
+    $role = Get-MgDirectoryRole | Where-Object { $_.DisplayName -eq "Global Administrator" }
+    if ($null -eq $role) { Write-Host "Global Administrator role not enabled." ; return }
+
+    # Get all members assigned to Global Administrator
+    $admins = Get-MgDirectoryRoleMember -DirectoryRoleId $role.Id
+
+    # Filter to only user objects and print info
+    Write-Host "** Global Administrators **" 
+    $admins | Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.user' }  | ForEach-Object {
+        $user = Get-MgUser -UserId $_.Id -Property UserPrincipalName, DisplayName 
+        Write-Output "$($user.DisplayName) - $($user.UserPrincipalName)"
     }
 
-    Import-Module Microsoft.Graph -ErrorAction Stop
+    # Get all subscribed license SKUs for the tenant
+    $licenses = Get-MgSubscribedSku
 
-    # Connect if not already connected
-    if (-not (Get-MgContext)) {
-        Connect-MgGraph -Scopes "Directory.Read.All"
+    # Display license usage info for each SKU
+    foreach ($license in $licenses) {
+        $skuPartNumber = $license.SkuPartNumber
+        $enabled = $license.PrepaidUnits.Enabled
+        $consumed = $license.ConsumedUnits
+        Write-Output "License SKU: $skuPartNumber"
+        Write-Output "  Purchased (Enabled): $enabled"
+        Write-Output "  Assigned (Consumed): $consumed"
+        Write-Output ""
     }
 
-    # Get tenant info
-    $org = Get-MgOrganization | Select-Object -First 1
 
-    # Get all directory roles
-    $roles = Get-MgDirectoryRole
 
-    # Find Global Administrator role
-    $globalAdminRole = $roles | Where-Object { $_.DisplayName -eq "Company Administrator" }
-    $globalAdmins = @()
-    if ($globalAdminRole) {
-        $globalAdmins = Get-MgDirectoryRoleMember -DirectoryRoleId $globalAdminRole.Id | Where-Object { $_.ODataType -eq "#microsoft.graph.user" } | Select-Object DisplayName, UserPrincipalName
-    }
-
-    [PSCustomObject]@{
-        TenantName   = $org.DisplayName
-        TenantId     = $org.Id
-        GlobalAdmins = $globalAdmins
-    }
 }
