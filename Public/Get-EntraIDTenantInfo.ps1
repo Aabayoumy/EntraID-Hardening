@@ -45,7 +45,7 @@ function Get-EntraIDTenantInfo {
     Connect-MgGraph -Scopes "Directory.Read.All", "RoleManagement.Read.Directory" -NoWelcome 
 
     # Get tenant (organization) info
-    $orgInfo = Get-MgOrganization | Format-List Id, DisplayName | Out-String
+    $orgInfo = Get-MgOrganization | Format-List  DisplayName, Id | Out-String
     $orgInfo.Trim().Split("`n") | ForEach-Object { Write-Host $_ -ForegroundColor Green }
 
     
@@ -61,7 +61,7 @@ function Get-EntraIDTenantInfo {
     Write-Host "** Global Administrators **"  -ForegroundColor Blue
     $admins | Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.user' }  | ForEach-Object {
         $user = Get-MgUser -UserId $_.Id -Property UserPrincipalName, DisplayName 
-        Write-Host "$($user.DisplayName) - $($user.UserPrincipalName)" -ForegroundColor Blue
+        Write-Host "   $($user.DisplayName) - $($user.UserPrincipalName)" -ForegroundColor Blue
     }
     Write-Host " " -ForegroundColor Blue
     # Get all subscribed license SKUs for the tenant
@@ -70,11 +70,7 @@ function Get-EntraIDTenantInfo {
     # Display license usage info for each SKU
     foreach ($license in $licenses) {
         $skuPartNumber = $license.SkuPartNumber
-        $enabled = $license.PrepaidUnits.Enabled
-        $consumed = $license.ConsumedUnits
         Write-Host "** License SKU: $skuPartNumber **" -ForegroundColor Cyan
-        Write-Host "  Purchased (Enabled): $enabled" -ForegroundColor Cyan
-        Write-Host "  Assigned (Consumed): $consumed" -ForegroundColor Cyan
 
         # Print Service Plans for this SKU
         if ($license.ServicePlans) {
@@ -82,10 +78,10 @@ function Get-EntraIDTenantInfo {
             foreach ($plan in $license.ServicePlans) {
                 $planName = $plan.ServicePlanName
                 $planId = $plan.ServicePlanId
-                $status = $plan.ProvisioningStatus
-                Write-Host "    - $planName (ID: $planId, Status: $status)" -ForegroundColor Cyan
+                Write-Host "   $planName (ID: $planId)" -ForegroundColor Cyan
             }
-        } else {
+        }
+        else {
             Write-Host "  No Service Plans found." -ForegroundColor DarkGray
         }
         Write-Host "" 
