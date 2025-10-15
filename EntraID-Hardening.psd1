@@ -21,7 +21,7 @@
     Description       = 'Creates a break-glass security group, a named location for suspicious countries, and a Conditional Access policy blocking those locations — excluding the break-glass group.'
 
     # Minimum version of the PowerShell engine required by this module
-    PowerShellVersion = '7'
+    PowerShellVersion = '7.0'
 
     # Functions to export from this module
     FunctionsToExport = @('Deploy-GeoBlock', 'Get-EntraIDHardeningSettings', 'Set-EntraIDHardeningSetting', 'Get-EntraIDTenantInfo')

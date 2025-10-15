@@ -39,10 +39,10 @@ function Get-EntraIDTenantInfo {
     [CmdletBinding()]
     param()
     # Import Microsoft Graph module (install if needed)
-    Import-Module Microsoft.Graph  -NoWelcome -ErrorAction Stop
+    Import-Module Microsoft.Graph  -ErrorAction Stop
 
     # Connect with minimal scopes required
-    Connect-MgGraph -Scopes "Directory.Read.All", "RoleManagement.Read.Directory"
+    Connect-MgGraph -Scopes "Directory.Read.All", "RoleManagement.Read.Directory" -NoWelcome 
 
     # Get tenant (organization) info
     $orgInfo = Get-MgOrganization | Format-List Id, DisplayName | Out-String
@@ -57,24 +57,38 @@ function Get-EntraIDTenantInfo {
     $admins = Get-MgDirectoryRoleMember -DirectoryRoleId $role.Id
 
     # Filter to only user objects and print info
-    Write-Host "** Global Administrators **" 
+    Write-Host ""
+    Write-Host "** Global Administrators **"  -ForegroundColor Blue
     $admins | Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.user' }  | ForEach-Object {
         $user = Get-MgUser -UserId $_.Id -Property UserPrincipalName, DisplayName 
         Write-Host "$($user.DisplayName) - $($user.UserPrincipalName)" -ForegroundColor Blue
     }
-
+    Write-Host " " -ForegroundColor Blue
     # Get all subscribed license SKUs for the tenant
-    $licenses = Get-MgSubscribedSku
+    $licenses = Get-MgSubscribedSku | Where-Object { $_.SkuPartNumber -eq "Microsoft_Entra_Suite" }
 
     # Display license usage info for each SKU
     foreach ($license in $licenses) {
         $skuPartNumber = $license.SkuPartNumber
         $enabled = $license.PrepaidUnits.Enabled
         $consumed = $license.ConsumedUnits
-        Write-Host "License SKU: $skuPartNumber" -ForegroundColor Blue
-        Write-Host "  Purchased (Enabled): $enabled" -ForegroundColor Blue
-        Write-Host "  Assigned (Consumed): $consumed" -ForegroundColor Blue
-        Write-Host "" -ForegroundColor Blue
+        Write-Host "** License SKU: $skuPartNumber **" -ForegroundColor Cyan
+        Write-Host "  Purchased (Enabled): $enabled" -ForegroundColor Cyan
+        Write-Host "  Assigned (Consumed): $consumed" -ForegroundColor Cyan
+
+        # Print Service Plans for this SKU
+        if ($license.ServicePlans) {
+            # Write-Host "  Service Plans:" -ForegroundColor Cyan
+            foreach ($plan in $license.ServicePlans) {
+                $planName = $plan.ServicePlanName
+                $planId = $plan.ServicePlanId
+                $status = $plan.ProvisioningStatus
+                Write-Host "    - $planName (ID: $planId, Status: $status)" -ForegroundColor Cyan
+            }
+        } else {
+            Write-Host "  No Service Plans found." -ForegroundColor DarkGray
+        }
+        Write-Host "" 
     }
 
 
