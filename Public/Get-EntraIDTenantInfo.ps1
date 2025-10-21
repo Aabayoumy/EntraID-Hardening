@@ -37,7 +37,10 @@
 
 function Get-EntraIDTenantInfo {
     [CmdletBinding()]
-    param()
+    param(
+        [bool]$DisplayGlobalAdmins = $true,
+        [bool]$DisplayLicense = $true
+    )
     # Import Microsoft Graph module (install if needed)
     Import-Module Microsoft.Graph  -ErrorAction Stop
 
@@ -48,45 +51,45 @@ function Get-EntraIDTenantInfo {
     $orgInfo = Get-MgOrganization | Format-List  DisplayName, Id | Out-String
     $orgInfo.Trim().Split("`n") | ForEach-Object { Write-Host $_ -ForegroundColor Green }
 
-    
-    # Get Global Administrator role ID
-    $role = Get-MgDirectoryRole | Where-Object { $_.DisplayName -eq "Global Administrator" }
-    if ($null -eq $role) { Write-Warning "Global Administrator role not enabled." ; return }
+        if ($DisplayGlobalAdmins) {
+        # Get Global Administrator role ID
+        $role = Get-MgDirectoryRole | Where-Object { $_.DisplayName -eq "Global Administrator" }
+        if ($null -eq $role) { Write-Warning "Global Administrator role not enabled." ; return }
 
-    # Get all members assigned to Global Administrator
-    $admins = Get-MgDirectoryRoleMember -DirectoryRoleId $role.Id
+        # Get all members assigned to Global Administrator
+        $admins = Get-MgDirectoryRoleMember -DirectoryRoleId $role.Id
 
-    # Filter to only user objects and print info
-    Write-Host ""
-    Write-Host "** Global Administrators **"  -ForegroundColor Blue
-    $admins | Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.user' }  | ForEach-Object {
-        $user = Get-MgUser -UserId $_.Id -Property UserPrincipalName, DisplayName 
-        Write-Host "   $($user.DisplayName) - $($user.UserPrincipalName)" -ForegroundColor Blue
+        # Filter to only user objects and print info
+        Write-Host ""
+        Write-Host "** Global Administrators **"  -ForegroundColor Blue
+        $admins | Where-Object { $_.AdditionalProperties.'@odata.type' -eq '#microsoft.graph.user' }  | ForEach-Object {
+            $user = Get-MgUser -UserId $_.Id -Property UserPrincipalName, DisplayName 
+            Write-Host "   $($user.DisplayName) - $($user.UserPrincipalName)" -ForegroundColor Blue
+        }
+        Write-Host " " -ForegroundColor Blue
     }
-    Write-Host " " -ForegroundColor Blue
-    # Get all subscribed license SKUs for the tenant
-    $licenses = Get-MgSubscribedSku | Where-Object { $_.SkuPartNumber -eq "Microsoft_Entra_Suite" }
 
-    # Display license usage info for each SKU
-    foreach ($license in $licenses) {
-        $skuPartNumber = $license.SkuPartNumber
-        Write-Host "** License SKU: $skuPartNumber **" -ForegroundColor Cyan
+    if ($DisplayLicense) {
+        # Get all subscribed license SKUs for the tenant
+        $licenses = Get-MgSubscribedSku | Where-Object { $_.SkuPartNumber -eq "Microsoft_Entra_Suite" }
 
-        # Print Service Plans for this SKU
-        if ($license.ServicePlans) {
-            # Write-Host "  Service Plans:" -ForegroundColor Cyan
-            foreach ($plan in $license.ServicePlans) {
-                $planName = $plan.ServicePlanName
-                $planId = $plan.ServicePlanId
-                Write-Host "   $planName (ID: $planId)" -ForegroundColor Cyan
+        # Display license usage info for each SKU
+        foreach ($license in $licenses) {
+            $skuPartNumber = $license.SkuPartNumber
+            Write-Host "** License SKU: $skuPartNumber **" -ForegroundColor Cyan
+
+            # Print Service Plans for this SKU
+            if ($license.ServicePlans) {
+                foreach ($plan in $license.ServicePlans) {
+                    $planName = $plan.ServicePlanName
+                    $planId = $plan.ServicePlanId
+                    Write-Host "   $planName (ID: $planId)" -ForegroundColor Cyan
+                }
             }
+            else {
+                Write-Host "  No Service Plans found." -ForegroundColor DarkGray
+            }
+            Write-Host "" 
         }
-        else {
-            Write-Host "  No Service Plans found." -ForegroundColor DarkGray
-        }
-        Write-Host "" 
     }
-
-
-
 }

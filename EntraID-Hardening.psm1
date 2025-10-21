@@ -18,3 +18,6 @@ $publicFunctions = Get-ChildItem -Path "$PSScriptRoot/Public/*.ps1" -ErrorAction
     (Get-Content $_.FullName | Select-String -Pattern '^function\s+([^\s{(]+)' | ForEach-Object { $_.Matches[0].Groups[1].Value })
 } | Where-Object { $_ }
 Export-ModuleMember -Function $publicFunctions
+
+# Run Get-EntraIDTenantInfo with both parameters set to $false on module import
+Get-EntraIDTenantInfo -DisplayGlobalAdmins:$false -DisplayLicense:$false

@@ -21,6 +21,31 @@ This module helps automate the creation of a break-glass security group, a named
    Get-Help Deploy-GeoBlock -Full
    ```
 
+---
+
+### Get-EntraIDTenantInfo
+
+Retrieves Entra ID (Azure AD) tenant information, including tenant name, id, global administrators, and license information.
+
+**Parameters:**
+- `-DisplayGlobalAdmins` (bool, default: `$true`): If `$true`, displays the list of Global Administrators. If `$false`, omits this section.
+- `-DisplayLicense` (bool, default: `$true`): If `$true`, displays license SKU and service plan information. If `$false`, omits this section.
+
+**Examples:**
+```powershell
+# Show all information (default)
+Get-EntraIDTenantInfo
+
+# Show only license information
+Get-EntraIDTenantInfo -DisplayGlobalAdmins:$false
+
+# Show only global administrators
+Get-EntraIDTenantInfo -DisplayLicense:$false
+
+# Show only tenant name and id
+Get-EntraIDTenantInfo -DisplayGlobalAdmins:$false -DisplayLicense:$false
+```
+
 ## Notes
 
 - You must have the `Microsoft.Graph.Identity.SignIns` module installed and be able to connect to Microsoft Graph with the required permissions.
