@@ -1,5 +1,6 @@
+
 function Deploy-GeoBlock {
-<#
+    <#
 .SYNOPSIS
   Creates a break-glass security group, a named location for suspicious countries, and a Conditional Access policy blocking those locations — excluding the break-glass group.
 
@@ -15,51 +16,14 @@ function Deploy-GeoBlock {
 
     try {
         Write-Output "Connecting to Microsoft Graph..."
-        Connect-MgGraph -Scopes "Group.ReadWrite.All", "Directory.ReadWrite.All", "Policy.ReadWrite.ConditionalAccess" -NoWelcome
-        # 1. Create Break-Glass Group
+        Connect-MgGraph -Scopes "Group.ReadWrite.All", "Directory.ReadWrite.All", "Policy.ReadWrite.ConditionalAccess", "Policy.Read.All" -NoWelcome | Out-Null
+
+        # 1. Setup Break-Glass Group and add users
         $groupName = $Global:EntraIDHardeningSettings.BreakGlassGroupName
-        $existingGroup = Get-MgGroup -Filter "displayName eq '$groupName'" -ConsistencyLevel eventual -CountVariable cnt
-        if ($existingGroup -and $cnt -gt 0) {
-            $groupId = $existingGroup.Id
-            Write-Output "Using existing group '$groupName' (ID: $groupId)."
-        }
-        else {
-            Write-Output "Creating break-glass group..."
-            $groupParams = @{
-                DisplayName     = $groupName
-                MailEnabled     = $false
-                SecurityEnabled = $true
-                MailNickname    = "BreakGlass"
-                Description     = "Emergency access accounts excluded from blocking policies"
-            }
-            $group = New-MgGroup -BodyParameter $groupParams
-            $groupId = $group.Id
-            Write-Output "Created group '$groupName' (ID: $groupId)."
-        }
-
-        # 2. Add users to Break-Glass Group from settings
         $breakGlassUserUPNs = $Global:EntraIDHardeningSettings.BreakGlassUserUPNs
-        if (-not $breakGlassUserUPNs) {
-            Write-Warning "No BreakGlassUserUPNs found in settings. Skipping user addition."
-        } else {
-            foreach ($upn in $breakGlassUserUPNs) {
-                $user = Get-MgUser -UserId $upn -ErrorAction SilentlyContinue
-                if ($null -eq $user) {
-                    Write-Warning "User $upn not found; skipping."
-                    continue
-                }
-                $memberCheck = Get-MgGroupMember -GroupId $groupId -All | Where-Object { $_.Id -eq $user.Id }
-                if ($memberCheck) {
-                    Write-Output "User $upn already in break-glass group."
-                }
-                else {
-                    Write-Output "Adding $upn to break-glass group..."
-                    New-MgGroupMember -GroupId $groupId -DirectoryObjectId $user.Id
-                }
-            }
-        }
+        $groupId = Initialize-BreakGlass -GroupName $groupName -UserUPNs $breakGlassUserUPNs
 
-        # 3. Create Named Location
+        # 2. Create Named Location
         $namedLocationName = "Suspicious Countries - High Risk"
         $existingLoc = Get-MgIdentityConditionalAccessNamedLocation -Filter "displayName eq '$namedLocationName'" -All
         if ($existingLoc) {
@@ -74,9 +38,9 @@ function Deploy-GeoBlock {
                 "BO", "HN", "VE", "DZ", "EC", "KG", "LK"  # Tier3
             )
             $locParams = @{
-                "@odata.type"                     = "#microsoft.graph.countryNamedLocation"
-                DisplayName                       = $namedLocationName
-                CountriesAndRegions               = $countries
+                "@odata.type" = "#microsoft.graph.countryNamedLocation"
+                DisplayName = $namedLocationName
+                CountriesAndRegions = $countries
                 IncludeUnknownCountriesAndRegions = $true
             }
             $loc = New-MgIdentityConditionalAccessNamedLocation -BodyParameter $locParams
@@ -93,22 +57,22 @@ function Deploy-GeoBlock {
         else {
             Write-Output "Creating Conditional Access policy in report-only mode..."
             $policyParams = @{
-                DisplayName   = $policyName
-                State         = "enabledForReportingButNotEnforced"
-                Conditions    = @{
-                    Users        = @{
-                        IncludeUsers  = @("All")
+                DisplayName = $policyName
+                State = "enabledForReportingButNotEnforced"
+                Conditions = @{
+                    Users = @{
+                        IncludeUsers = @("All")
                         ExcludeGroups = @($groupId)
                     }
                     Applications = @{
                         IncludeApplications = @("All")
                     }
-                    Locations    = @{
+                    Locations = @{
                         IncludeLocations = @($namedLocationId)
                     }
                 }
                 GrantControls = @{
-                    Operator        = "OR"
+                    Operator = "OR"
                     BuiltInControls = @("block")
                 }
             }
@@ -121,7 +85,7 @@ function Deploy-GeoBlock {
         Write-Error "ERROR: $($_.Exception.Message)"
     }
     finally {
-        Disconnect-MgGraph
+        Disconnect-MgGraph | Out-Null
         Write-Output "Disconnected from Microsoft Graph."
     }
 }
